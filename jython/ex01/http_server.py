@@ -3,6 +3,7 @@ from java.net import *
 from java.lang import *
 
 import sys, os
+import jarray
 
 # WEB_ROOT is the directory where our HTML and other files reside.
 # For this package, WEB_ROOT is the "webroot" directory under the working
@@ -10,7 +11,8 @@ import sys, os
 # The working directory is the location in the file system
 # from where the java command was invoked.
 #WEB_ROOT = os.getcwd() + File.separator + 'webroot'
-WEB_ROOT = '~/tmp/webroot'
+#WEB_ROOT = '~/tmp/webroot'
+WEB_ROOT = '/Users/adharmad/tmp/webroot'
 
 SHUTDOWN_COMMAND = '/SHUTDOWN'
 PORT = 8080
@@ -23,11 +25,16 @@ class Request:
 
     def parse(self):
         request = ''
+        buffer = jarray.zeros(2048, 'b')
+        charsRead = 0
 
         try:
-            self.input.read(request)
+            charsRead = self.input.read(buffer)
         except IOException as ioex:
             ioex.printStackTrace()
+            charsRead = -1
+
+        request = buffer.tostring()
 
         print("Request is\n")
         print(request)
@@ -36,9 +43,9 @@ class Request:
 
     def parseUri(self, reqStr):
         try:
-            idx1 = reqStr.index('/')
-            idx2 = reqStr.index('/', idx+1)
-            return reqStr[idx+1:idx2]
+            idx1 = reqStr.index(' ')
+            idx2 = reqStr.index(' ', idx1+1)
+            return reqStr[idx1+1:idx2]
         except ValueError as ve:
             return None
 
@@ -49,13 +56,17 @@ class Request:
 #   Status-Line = HTTP-Version SP Status-Code SP Reason-Phrase CRLF
 class Response:
 
+    ERRORMESSAGE = """
+    HTTP/1.1 404 File Not Found\r\n
+    Content-Type: text/html\r\n
+    Content-Length: 23\r\n\r\n
+    <h1>File Not Found</h1>
+    """
     def __init__(self, out):
         self.request = None
         self.out = out
 
     def sendStaticResource(self):
-        fis = None
-        
         try:
             f = open(WEB_ROOT + self.request.uri, 'r')
             lines = f.readlines()
@@ -65,14 +76,10 @@ class Response:
             f.close()
             self.out.write(content)
         except IOError as ioerr:
-            errorMessage = """
-            HTTP/1.1 404 File Not Found\r\n
-            Content-Type: text/html\r\n
-            Content-Length: 23\r\n\r\n
-            <h1>File Not Found</h1>
-            """
-            self.out.write(errorMessage)
+            pass
 
+    def sendErrorMessage(self):
+        self.out.write(self.ERRORMESSAGE)
 
 class HttpServer:
     def __init__(self):
@@ -112,10 +119,16 @@ class HttpServer:
                 socket.close()
 
                 # check if the previous URI is a shutdown command
-                shutdown = request.url == SHUTDOWN_COMMAND
+                self.shutdown = request.uri == SHUTDOWN_COMMAND
 
-            except Exception as ex:
-                ex.printStackTrace()
+            #except IOError as ioerr:
+            #    print(ioerr)
+
+            #except Exception as ex:
+            #    ex.printStackTrace()
+            except:
+                print("---------------------")
+                response.sendErrorMessage()
 
 # Entry point
 if __name__ == '__main__':
